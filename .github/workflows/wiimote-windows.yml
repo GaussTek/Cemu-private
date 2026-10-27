@@ -1,0 +1,61 @@
+name: Wiimote Motion Fix - Windows
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  VCPKG_ROOT: ${{ github.workspace }}/dependencies/vcpkg
+  VCPKG_BINARY_SOURCES: 'clear;nuget,GitHub,readwrite'
+  VCPKG_FORCE_DOWNLOADED_BINARIES: true
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout experimental branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/emulated-wiimote-motion
+          submodules: recursive
+
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.29.0'
+
+      - name: Bootstrap vcpkg
+        run: ./dependencies/vcpkg/bootstrap-vcpkg.bat
+
+      - name: Setup NuGet credentials for vcpkg
+        shell: bash
+        run: |
+          NUGET="$(./dependencies/vcpkg/vcpkg.exe fetch nuget | tail -n 1)"
+          "$NUGET" sources add \
+            -source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+            -storepasswordincleartext \
+            -name GitHub \
+            -username "${{ github.repository_owner }}" \
+            -password "${{ secrets.GITHUB_TOKEN }}"
+          "$NUGET" setapikey "${{ secrets.GITHUB_TOKEN }}" \
+            -source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+
+      - name: Configure Cemu
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=release -DVCPKG_INSTALL_OPTIONS="--clean-after-build"
+
+      - name: Build Cemu
+        run: cmake --build build --config release
+
+      - name: Prepare executable
+        shell: pwsh
+        run: Copy-Item bin/Cemu_release.exe bin/Cemu.exe
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Cemu-Wiimote-Motion-Fix-Windows
+          path: bin/Cemu.exe
+          if-no-files-found: error
