@@ -262,6 +262,13 @@ void WPADController::KPADRead(KPADStatus_t& status, const BtnRepeat& repeat)
 
 		glm::vec3 acc;
 		motion_sample.getAccelerometer(&acc[0]);
+
+		// Experimental Wii Remote horizontal tilt correction.
+		// Disable to compare with upstream behavior.
+		constexpr bool kFixEmulatedWiimoteHorizontalTilt = true;
+		if (kFixEmulatedWiimoteHorizontalTilt && type() == Wiimote)
+			acc.x = -acc.x;
+
 		status.acc.x = acc.x;
 		status.acc.y = acc.y;
 		status.acc.z = acc.z;
